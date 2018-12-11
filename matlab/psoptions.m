@@ -28,10 +28,10 @@ opt.seecascade = 1;
 
 %% time-domain simulation options
 opt.sim.integration_scheme = 1; % 1 = trapezoidal rule, 2 = implicit ode15i, 3 = explicit ode15s
-opt.sim.var_step = true;        % fixed (false) or variable (true) integration step size
+opt.sim.var_step = false;        % fixed (false) or variable (true) integration step size
 opt.sim.ramp_frac = 0.05;       % fraction of generator allowed to ramp between generations
 opt.sim.writelog  = true;       % write differential and algebraic variables to a file
-opt.sim.dt_default = 1/30;      % default sampling rate (30Hz)
+opt.sim.dt_default = 1/60;      % default sampling rate (30Hz)
 opt.sim.max_iters = 20;         % default number of newton iterations for trapezoidal solver
 opt.sim.tolerance = 1e-6;       % newton convergence tolerance
 opt.sim.draw = true;
@@ -45,8 +45,9 @@ opt.sim.uvls_tdelay_ini = 0.5;  % 1 sec delay for uvls relay.
 opt.sim.ufls_tdelay_ini = 0.5;  % 1 sec delay for ufls relay.
 opt.sim.dist_tdelay_ini = 0.5;  % 1 sec delay for dist relay.
 opt.sim.temp_tdelay_ini = 0;    % 0 sec delay for temp relay.
-opt.sim.dt_max_default = 1;
+opt.sim.dt_max_default = 1/60;
 opt.sim.optimizer = 'linprog';
+opt.sim.resuming_sim = 0;       % If set to 1, x and y vectors must be supplied
 
 % temperature relay settings
 opt.sim.temp.TA        = 75-20;        % the thermal limits for ACSR conductor, 75C; the ambient temerature 20C

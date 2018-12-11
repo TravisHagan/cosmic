@@ -44,11 +44,20 @@ tap( abs(tap)<eps ) = 1.0;
 
 % calculate the branch impedance values
 y_series = 1./(R+j*X);
-tap_shift = tap .* exp(-j*pi/180 * shift);
+tap_shift = tap .* exp(-j*pi/180 * shift); % All 1's
 y_tt = status.*( y_series + j*B/2);
 y_ff = status.*( y_tt ./ tap.^2);
 y_ft = status.*(-y_series ./ conj(tap_shift));
 y_tf = status.*(-y_series ./ tap_shift);
+
+%{
+
+y_tt = y_series + j*B/2
+y_ff = y_tt
+y_ft = -y_series
+y_tf = -y_series
+
+%}
 
 % build these values into a sparse ybus matrix
 Ybus = sparse(F,F,y_ff,n,n) + ...

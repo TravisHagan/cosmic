@@ -1,4 +1,4 @@
-function [outputs,ps] = simgrid(ps,event,outfilename,opt)
+function [outputs,ps,x,y] = simgrid(ps,event,outfilename,opt,x_in,y_in)
 % usage: [outputs,ps] = simgrid(ps,event,outfilename,opt)
 % perform a cascading failure simulation
 % inputs:
@@ -89,8 +89,16 @@ end
 if ~isfield(ps,'Ybus') || ~isfield(ps,'Yf') || ~isfield(ps,'Yt')
     [ps.Ybus,ps.Yf,ps.Yt] = getYbus(ps,false);
 end
-% build x and y
-[x,y] = get_xy(ps,opt);
+
+if opt.sim.resuming_sim == 0
+    % build x and y
+    [x,y] = get_xy(ps,opt);
+else
+    % Restore x and y from previous simulation:
+    x = x_in;
+    y = y_in;
+end
+
 
 %% step through the simulation
 event_no = 1;
@@ -110,6 +118,7 @@ while t < t_end
     if opt.verbose
         fprintf('\n Simulating from t=%g s to t=%g s\n',t,t_next);
     end
+    
     [ps,t_out,X,Y] = simgrid_interval(ps,t,t_next,x,y,opt);
     if opt.verbose
         fprintf(' Completed simulation up until t=%g\n',t_out(end));
@@ -121,7 +130,7 @@ while t < t_end
             fprintf(' Writing simulation results to %s\n',outfilename);
         end
         write_state(outfilename,t_out,X,Y);
-    end;
+    end
     
     % update time and solutions for next interval
     t = t_next;
