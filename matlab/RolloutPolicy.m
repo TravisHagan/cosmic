@@ -70,12 +70,19 @@ for bus = 1:length(results(:,1))     % Generate list of buses
     iteration = 0;
     sim_time = 0;
     
-    index = (results(bus,1)+3)/4;
+    % get shunt line number
+    index = find(results(bus) == ps.shunt(:,1));
+    
     shed_percent = results(bus,2);
     
-    if bus ~= -99   % bus has no loads
+    % debugging
+    % fprintf('Index: %d\n',index)
+    
+    if bus ~= -99   % bus has loads
         ps.shunt(index,C.sh.factor) = (1-shed_percent);
     end
+    
+    time_multiplier = 1;
     
     while sim_time <= t_max
         sim_time = sim_time + time_step;
@@ -91,6 +98,11 @@ for bus = 1:length(results(:,1))     % Generate list of buses
         results(bus,3) = results(bus,3) + ...
             beta^iteration*reward_calculation(load_initial, load_current);
         iteration = iteration + 1;
+        
+        if (100*sim_time/115) >= time_multiplier*10
+            fprintf('Sim percentage: %2.0f%%\n', 10*time_multiplier)
+            time_multiplier = time_multiplier + 1;
+        end
     end
         
 end

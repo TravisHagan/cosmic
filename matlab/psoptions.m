@@ -60,5 +60,8 @@ opt.sim.ufls_limit = 0.95;     % threshold at which under frequency load sheddin
 opt.sim.ufls_delta = 0.25;     % load shedding fraction
 opt.sim.zone1_distance = 0.9;  % zone 1 default distance (90% of line impedance)
 
+%
+opt.sim.use_data_correction = false;
+
 % legacy
 opt.simdc = opt.sim;

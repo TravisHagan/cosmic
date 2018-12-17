@@ -1,10 +1,10 @@
 %% Rollout policy simulation file
 clear all; close all; clc;
 
-tic
-
-t_max = 115;         % Simulation time
-time_step = 1/60;
+t_cont = 5;             % When the contingency should occur
+t_rollout = 10;         % When the rollout policy begins
+t_max = 30;             % Simulation end time
+time_step = 1/60;       % Time step for rollout policy
 
 if ~(ismcc || isdeployed)
     addpath('../data');
@@ -15,8 +15,21 @@ C = psconstants;
 opt = psoptions;
 
 load('rts96.mat','ps');
+
+%% Output file:
+
+opt.sim.use_data_correction = true;
+
 results = cell(length(ps.branch(:,1)),4);         % Allocate cell matrix
 
+output_file = sprintf('sim_rts96_%s', datestr(now,'yyyy-mm-dd_HHMMSS'));
+
+results_struct.begin_time = datestr(now);
+results_struct.t_max = t_max;
+results_struct.data_correction = opt.sim.use_data_correction;
+
+
+%%
 for k = 1:length(ps.branch(:,1))
     results{k,1} = ps.branch(k, C.br.from);
     results{k,2} = ps.branch(k, C.br.to);
@@ -48,6 +61,7 @@ for k = 1:length(ps.branch(:,1))
     opt.sim.ufls_tdelay_ini = 0.5;  % 1 sec delay for ufls relay.
     opt.sim.dist_tdelay_ini = 0.5;  % 1 sec delay for dist relay.
     opt.sim.temp_tdelay_ini = 1e6;    % 0 sec delay for temp relay.
+    opt.sim.writelog = false;
     % Don't forget to change this value (opt.sim.time_delay_ini) in solve_dae.m
 
     opt.sim.var_step = 0.1;
@@ -99,11 +113,11 @@ for k = 1:length(ps.branch(:,1))
     event(1,[C.ev.time C.ev.type]) = [0 C.ev.start];
     
     % trip a branch
-    event(2,[C.ev.time C.ev.type]) = [5 C.ev.trip_branch];
+    event(2,[C.ev.time C.ev.type]) = [t_cont C.ev.trip_branch];
     event(2, C.ev.branch_loc) = ps.branch(k, C.br.id);
     
     % set the end time
-    event(3,[C.ev.time C.ev.type]) = [5.001 C.ev.finish];
+    event(3,[C.ev.time C.ev.type]) = [t_rollout C.ev.finish];
 
 
     %% run the simulation
@@ -111,12 +125,19 @@ for k = 1:length(ps.branch(:,1))
     
     save_sim_state(ps,x,y,'save_state');
 
-    results{k,4} = RolloutPolicy(ps, opt, C, time_step, t_max, 'save_state');
+    results{k,4} = RolloutPolicy(ps, opt, C, time_step, (t_max-t_rollout), 'save_state');
+    
+    % Take some action and continue simulation...
+    % Implement later
+    
             
 end
 
+results_struct.end_time = datestr(now);
+results_struct.calculations = results;
 
-toc
+save(output_file,'results_struct');
+
 
 
 

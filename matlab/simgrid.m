@@ -75,14 +75,16 @@ t_end = event(end,1);
 t = t_0;
 
 %% print something
-out = fopen(outfilename,'w');
-if isempty(out)
-    error('simgrid:err','could not open outfile: %s',outfilename);
+if opt.sim.writelog
+    out = fopen(outfilename,'w');
+    if isempty(out)
+        error('simgrid:err','could not open outfile: %s',outfilename);
+    end
+    fclose(out);
 end
-fprintf(out,'starting simulation at t = %g\n',t);
-fclose(out);
 
 if verbose
+    fprintf(out,'starting simulation at t = %g\n',t);
     fprintf('starting simulation at t = %g\n',t);
     fprintf('writing results to %s\n',outfilename);
 end
@@ -120,6 +122,19 @@ while t < t_end
     % try to simulate between t and t_next
     if opt.verbose
         fprintf('\n Simulating from t=%g s to t=%g s\n',t,t_next);
+    end
+    
+    %******************************
+    %
+    %       attack goes here
+    %
+    %       May need to run get_mac_state() to get x matrix
+    %
+    %******************************
+    
+    if opt.sim.use_data_correction    % requesting the data correction algorithm
+        % Grab relevant data (ps, x, y)
+        
     end
     
     [ps,t_out,X,Y] = simgrid_interval(ps,t,t_next,x,y,opt);
@@ -161,9 +176,7 @@ end
 outputs.event_record    = event_record;
 outputs.computer_time   = etime(clock,ct);
 
-save(tracefilename,'x','y');
+% save(tracefilename,'x','y');
 if opt.verbose
     fprintf('Completed simulation from %d sec. to %d sec. \n',t_0,t_next);
-end
-
-
+end 
