@@ -33,7 +33,10 @@ end
 if nargin<4 || isempty(opt)
     opt = psoptions;
 end
-
+if nargin<5 || isempty(x_in)
+    x_in = [];
+    y_in = [];
+end
 %% clean up the ps structure
 ps = updateps(ps);
 
@@ -162,3 +165,5 @@ save(tracefilename,'x','y');
 if opt.verbose
     fprintf('Completed simulation from %d sec. to %d sec. \n',t_0,t_next);
 end
+
+

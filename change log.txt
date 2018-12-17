@@ -1,0 +1,21 @@
+1. RTS1996 case file was added:
+	Based off the MatPower version
+	Branch rate B was added as the midpoint between A and C
+	Generators were grouped into one unit
+	Governor values were found to crash Cosmic:
+		Ti - integrator time constant (from Ki) was set to 4 from default of 0 to match case 39
+		LCmax and LCmin were changed from default of (+/-)10 to (+/-)100
+	
+2.	A generic rts96 simulation file was created. It is based on the example cases.
+	
+3. Resuming from a state was added as an additional feature:
+	This does not change the program calls and only allows for the feature
+	Added:
+		load_sim_state.m
+		save_sim_state.m
+	Modified:
+		psoptions.m - Added new option: opt.sim.resuming_sim
+		simgrid.m - function allows for x and y state variables to be inserted as a starting point, user does not need to provide these to use non resuming case
+
+4. Adding a rollout load shedding policy
+	
