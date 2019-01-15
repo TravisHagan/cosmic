@@ -51,7 +51,6 @@ switch mode
         relay(:,C.re.setting1) = opt.sim.ufls_delta;
         relay(:,C.re.tripped)   = 0;
         relay(:,C.re.id)        = 1:n_shunt;
-
     case 'distance'
         relay = zeros(m,C.relay.cols);
         relay(:,C.re.type) = C.relay.dist;
@@ -62,6 +61,8 @@ switch mode
         relay(:,C.re.threshold) = y_threshold;
         relay(:,C.re.tripped)   = 0;
         relay(:,C.re.id)        = 1:m;
+    case 'none'
+        % No relays are created
     otherwise
         % make relays of all types
         relay_temp = get_relays(ps,'temperature',opt);

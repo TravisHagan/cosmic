@@ -1,4 +1,4 @@
-function yhat = Data_correction_module(y)
+function yhat = Data_correction_module(y, Ybus)
 
 % Load testcase
 testcase = 'RTS_96_MatPower';
@@ -6,11 +6,14 @@ mpc = loadcase(testcase);
 buss = mpc.bus(:,1);
 system = ext2int(mpc);
 
+buss = ps.bus(1,:);
+
+
+
 
 system.Nbus = size(system.bus,1); % number of buses
 system.Nbranch = size(system.branch,1); % number of branches
-Y = full(mmakeYbus(system)); % Compute admittance matrix
-[H] = ComplexPhasor(system,Y); % Linear operator
+[H] = ComplexPhasor(system,Ybus); % Linear operator
 
 % Deployed PMUs
 binocoffcient = 7;
@@ -25,7 +28,7 @@ Iflow_range = [];
 numberofatoms = [];
 
 for ik = 1 : 1 : length(pmu_meter)
-    [temp extra] = genmeter(pmu_meter(ik),system,2);
+    [temp, extra] = genmeter(pmu_meter(ik),system,2);
     pmu_measured_rowmeter = [pmu_measured_rowmeter ;temp];
     Voltage_range = [Voltage_range ; find(pmu_measured_rowmeter == temp(1))];
     for r = 2 : 1: length(temp)
@@ -69,7 +72,7 @@ while(termination > threshold && kk <10 )
         end
     end
     
-    [val idx] = sort(projection,'descend');
+    [val, idx] = sort(projection,'descend');
     select = idx(1);
     supportbeta = [supportbeta ,select];
     supportdiagbeta = [supportdiagbeta; find(ismember(pmu_measured_rowmeter,genmeter(pmu_meter(select),system,2)))];
@@ -79,14 +82,14 @@ while(termination > threshold && kk <10 )
     termination = norm(residue)^2;
     kk = kk + 1;
 end
-supportbeta
+% supportbeta
 
 phialpha = diag(exp(1j*diagbeta));
 yhat = pinv(phialpha)*y;
 end
 
 
-function [out outt] = genmeter(list,system,status)
+function [out, outt] = genmeter(list,system,status)
 
 Nbus = size(system.bus,1);
 Nbranch = size(system.branch,1);

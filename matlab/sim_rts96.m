@@ -14,7 +14,7 @@ set time to 1e6 from 0
 %% Simulate RTS 96
 clear all; close all; clc;
 
-t_max = 5;         % Simulation time
+t_max = 15;         % Simulation time
 
 if ~(ismcc || isdeployed)
     addpath('../data');
@@ -27,9 +27,10 @@ opt.sim.resuming_sim = 0;       % 0 - not resuming case, 1 - loads value from a 
 
 
 if opt.sim.resuming_sim == 0
-    load('rts96.mat','ps')
+    load('rts96_S.mat','ps')
     x_in = [];
     y_in = [];
+    ps_initial = ps;
 else
     [ps, x_in, y_in] = load_sim_state();
 end
@@ -46,6 +47,7 @@ opt.sim.dt_default              = 1/60;
 opt.nr.use_fsolve               = true;
 % opt.pf.linesearch             = 'cubic_spline';
 opt.verbose                     = true;
+opt.sim.writelog                = true;
 opt.sim.gen_control = 1;        % 0 = generator without exciter and governor, 1 = generator with exciter and governor
 opt.sim.angle_ref = 0;          % 0 = delta_sys, 1 = center of inertia---delta_coi
                                 % Center of inertia doesn't work when having islanding
@@ -105,16 +107,16 @@ dist2threshold          = inf(size(ix.re.oc, 2)*2, 1);
 state_a                 = zeros(size(ix.re.oc, 2)*2, 1);
 
 %% Build an event matrix
-event = zeros(2, C.ev.cols);
+event = zeros(3, C.ev.cols);
 % start
-event(2,[C.ev.time C.ev.type]) = [0 C.ev.start];
+event(1,[C.ev.time C.ev.type]) = [0 C.ev.start];
 
 % trip a branch
-% event(2,[C.ev.time C.ev.type]) = [3 C.ev.trip_branch];
-% event(2,C.ev.branch_loc) = 1;
+event(2,[C.ev.time C.ev.type]) = [3 C.ev.trip_branch];
+event(2,C.ev.branch_loc) = 1;
 
 % set the end time
-event(2,[C.ev.time C.ev.type]) = [t_max C.ev.finish];
+event(3,[C.ev.time C.ev.type]) = [t_max C.ev.finish];
 
 
 %% run the simulation
@@ -122,35 +124,37 @@ event(2,[C.ev.time C.ev.type]) = [t_max C.ev.finish];
 
 save_sim_state(ps,x,y);
 
+
 %% print the results
-fname = outputs.outfilename;
-[t,delta,omega,Pm,Eap,Vmag,theta,E1,Efd,P3,Temperature] = read_outfile(fname,ps,opt);
-omega_0 = 2*pi*ps.frequency;
-omega_pu = omega / omega_0;
-
-figure(1); clf; hold on; 
-nl = size(omega_pu,2); colorset = varycolor(nl);
-% set(gca,'ColorOrder',colorset,'FontSize',18,'Xtick',[0 600 1200 1800],...
-%     'Xlim',[0 50],'Ylim',[0.995 1.008]);
-plot(t,omega_pu);
-ylabel('\omega (pu)','FontSize',18);
-xlabel('time (sec.)','FontSize',18);
-% PrintStr = sprintf('OmegaPu_P_%s_%s_%s',CaseName, Contingency, Control);
-% print('-dpng','-r600',PrintStr)
-
-figure(2); clf; hold on; 
-nl = size(theta,2); colorset = varycolor(nl);
-% set(gca,'ColorOrder',colorset,'FontSize',18,'Xlim',[0 50],'Ylim',[-0.2 0.5]);
-plot(t,theta);
-ylabel('\theta','FontSize',18);
-xlabel('time (sec.)','FontSize',18);
-
-figure(3); clf; hold on; 
-nl = size(Vmag,2); colorset = varycolor(nl);
-% set(gca,'ColorOrder',colorset,'FontSize',18,'Xlim',[0 50],'Ylim',[0.88 1.08]);
-plot(t,Vmag);
-ylabel('|V|','FontSize',18);
-xlabel('time (sec.)','FontSize',18);
+if opt.sim.writelog
+    fname = outputs.outfilename;
+    [t,delta,omega,Pm,Eap,Vmag,theta,E1,Efd,P3,Temperature] = read_outfile(fname,ps,opt);
+    omega_0 = 2*pi*ps.frequency;
+    omega_pu = omega / omega_0;
+    
+    figure(1); clf; hold on;
+    nl = size(omega_pu,2); colorset = varycolor(nl);
+    % set(gca,'ColorOrder',colorset,'FontSize',18,'Xtick',[0 600 1200 1800],...
+    %     'Xlim',[0 50],'Ylim',[0.995 1.008]);
+    plot(t,omega_pu);
+    ylabel('\omega (pu)','FontSize',18);
+    xlabel('time (sec.)','FontSize',18);
+    % PrintStr = sprintf('OmegaPu_P_%s_%s_%s',CaseName, Contingency, Control);
+    % print('-dpng','-r600',PrintStr)
+    
+    figure(2); clf; hold on;
+    nl = size(theta,2); colorset = varycolor(nl);
+    % set(gca,'ColorOrder',colorset,'FontSize',18,'Xlim',[0 50],'Ylim',[-0.2 0.5]);
+    plot(t,theta);
+    ylabel('\theta','FontSize',18);
+    xlabel('time (sec.)','FontSize',18);
+    
+    figure(3); clf; hold on;
+    nl = size(Vmag,2); colorset = varycolor(nl);
+    % set(gca,'ColorOrder',colorset,'FontSize',18,'Xlim',[0 50],'Ylim',[0.88 1.08]);
+    plot(t,Vmag);
+    ylabel('|V|','FontSize',18);
+    xlabel('time (sec.)','FontSize',18);
 
 %{
 figure(5); clf; hold on; 
@@ -197,5 +201,4 @@ ylabel('Temperature ( ^{\circ}C)','Interpreter','tex','FontSize',18);
 xlabel('time (sec.)','FontSize',18);
 %}
 
-
-
+end

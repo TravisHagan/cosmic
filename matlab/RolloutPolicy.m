@@ -1,15 +1,11 @@
-function results = RolloutPolicy(ps, opt, C, time_step, t_max, save_file)
-% Summary of this function goes here
-%   Detailed explanation goes here
+function results = RolloutPolicy(ps, opt, C, time, save_file, Rollout_file)
+% RolloutPolicy is a load shedding algorithm that determines which load to
+% shed
+%   
 % Based on Carter Lasseter's Python based system for PSSE
 %
 % Only configured for constant power loads (P).
 %
-% Results matrix columns: 'bus number of load', 'shed percentage',
-% 'reward', 'status (0 indicates blackout)'
-
-
-
 %% Notes:
 % Do not use the ps.bus.Pd or similar values. These are not used by the
 % program
@@ -21,30 +17,33 @@ function results = RolloutPolicy(ps, opt, C, time_step, t_max, save_file)
 % currently being used. To simplify this script, only (P) loads are used
 % in the calculation.
 %
-%
 
+global attack;
 
 %% Store current operating point
-
-n_sh = length(ps.shunt(:,1));
 
 % save ps and save_state
 load_initial = current_state(ps, C);
 
-results = zeros((4*n_sh)+1,4);      % n_sh is a global variable
-results(:,4) = 1;
+%% Generate the result matrix
+fields = {'LS50','LS75','LS0'};
+ls = [50, 75, 0];
 
-results(1:n_sh,1) = load_initial.b;
-
-for k = 1:length(load_initial.b)
-    col=[1,2];
-    results(4*k-3,col) = [load_initial.b(k), 1];
-    results(4*k-2,col) = [load_initial.b(k), 0.75];
-    results(4*k-1,col) = [load_initial.b(k), 0.5];
-    results(4*k-0,col) = [load_initial.b(k), 0.25];
+for k = 1:(numel(fields)-1)
+    results.(fields{k}).bus = load_initial.b;
+    results.(fields{k}).reward = zeros(numel(load_initial.b),1);
+    results.(fields{k}).status = ones(numel(load_initial.b),1);
+    results.(fields{k}).demand_lost = zeros(numel(load_initial.b),1);
+    results.(fields{k}).Load_shedding_percent = ls(k);
 end
 
-results(end,1) = -99;                   % -99 indicates a do nothing case
+% Do nothing case
+results.LS0.bus = -99;
+results.LS0.reward = 0;
+results.LS0.status = 1;
+results.LS0.Load_shedding_percent = 0;
+results.LS0.demand_lost = 0;
+results.case = Rollout_file;
 
 
 %% Network actions:
@@ -56,57 +55,87 @@ LS_actions = ps.shunt;
 
 %% Loop over all LS actions
 beta = 1;
-total_reward = [];  % Preallocate?
 
-% Check all buses with loads
-for bus = 1:length(results(:,1))     % Generate list of buses
-    fprintf('Checking bus: %2.0d with shed percent %d\n',...
-        results(bus,1),100*results(bus,2));
+% Check the results
+
+for m = 1:numel(fields)
+    shed_percent = results.(fields{m}).Load_shedding_percent;       % Current load shed percent
     
-    % Reload case
-    [ps, x, y] = load_sim_state(save_file);
-    
-    % Reset counters and variables
-    iteration = 0;
-    sim_time = 0;
-    
-    % get shunt line number
-    index = find(results(bus) == ps.shunt(:,1));
-    
-    shed_percent = results(bus,2);
-    
-    % debugging
-    % fprintf('Index: %d\n',index)
-    
-    if bus ~= -99   % bus has loads
-        ps.shunt(index,C.sh.factor) = (1-shed_percent);
-    end
-    
-    time_multiplier = 1;
-    
-    while sim_time <= t_max
-        sim_time = sim_time + time_step;
-        [outputs,ps,x,y] = rollout_continuation(ps, x, y, opt, C, time_step);
+    for n = 1:numel(results.(fields{m}).bus)                        % List of all buses with loads
+        cur_bus = results.(fields{m}).bus(n);                       % Current bus with load
         
-        if outputs.success == false
-            results(bus,4) = 0;
-            break;
+        fprintf('Checking bus: %2.0d with shed percent %d.',...
+            cur_bus,shed_percent);
+    
+        % Reload case
+        [ps, x, y] = load_sim_state(save_file);
+    
+        % Reset counters and variables
+        iteration = 0;
+        time.sim = 0;
+    
+        % get shunt line number
+        index = find(cur_bus == ps.shunt(:,1));
+    
+        % debugging
+        % fprintf('Index: %d\n',index)
+    
+        if cur_bus ~= -99   % bus has loads
+            ps.shunt(index,C.sh.factor) = (1-shed_percent/100);
+        end
+    
+        time.multiplier = 1;
+        t_step = time.step;         % Load default time step
+        attack.t_cur = attack.t_start;
+    
+        while time.sim <= time.max
+            % Variable time step
+            if time.sim < 5
+                t_step = time.step;
+            elseif time.sim >= 5 && time.sim < 10   % (5 <= time < 10)
+                t_step = time.step1;
+            elseif time.sim >= 10               % (10 < time)
+                t_step = time.step2;
+            end
+            time.sim = time.sim + t_step;
+        
+            [outputs,ps,x,y] = rollout_continuation(ps, x, y, opt, C, t_step);
+            attack.t_cur = attack.t_cur + outputs.t_simulated(end);
+        
+            % Simulation failed or blackout
+            if outputs.success == false
+                results.(fields{m}).status(n) = 0;
+                break;
+            end
+            
+            % Store total demand lost
+            results.(fields{m}).demand_lost(n) =...
+                results.(fields{m}).demand_lost(n) + outputs.demand_lost;
+            
+            load_current = current_state(ps, C);
+       
+            results.(fields{m}).reward(n) = results.(fields{m}).reward(n)+...
+                beta^iteration*reward_calculation(load_initial, load_current);
+            
+            iteration = iteration + 1;
+            
+            %{
+            % Additional Outputs
+            if (100*time.sim/time.max) >= time.multiplier*25
+                fprintf('Sim percentage: %2.0f%%\n', 25*time.multiplier)
+                time.multiplier = time.multiplier + 1;
+            end
+            %}
         end
         
-        load_current = current_state(ps, C);
+        keyboard
         
-        results(bus,3) = results(bus,3) + ...
-            beta^iteration*reward_calculation(load_initial, load_current);
-        iteration = iteration + 1;
-        
-        if (100*sim_time/115) >= time_multiplier*10
-            fprintf('Sim percentage: %2.0f%%\n', 10*time_multiplier)
-            time_multiplier = time_multiplier + 1;
-        end
+        fprintf(' Reward: %2.2f. Demand_lost %2.3f\n',results.(fields{m}).reward(n),results.(fields{m}).demand_lost(n));
     end
-        
 end
 
+outfile = strcat('Results\',Rollout_file,'.mat');
+save(outfile, 'results');
 
 end
 

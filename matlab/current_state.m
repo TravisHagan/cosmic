@@ -1,5 +1,6 @@
 function load = current_state(ps, C)
-% Returns the current state of loads, and voltages.
+%current_state(ps, C) builds a load matrix that contains bus voltage, bus
+%angle, loads (in active and reactive)
 % 
 % State variables:
 % bus_nums = ps.shunt(:, C.sh.bus)
@@ -19,8 +20,8 @@ no_load = find(t==0);
 load.v = ps.bus(has_load, C.bus.Vmag);
 load.va = ps.bus(has_load, C.bus.Vang);
 load.id = ps.shunt(:, C.sh.id);
-load.active = ps.shunt(:, C.sh.P);
-load.reactive = ps.shunt(:,C.sh.Q);
+load.active = ps.shunt(:, C.sh.P)*ps.shunt(:, C.sh.factor);
+load.reactive = ps.shunt(:,C.sh.Q)*ps.shunt(:, C.sh.factor);
 
 end
 

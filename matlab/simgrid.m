@@ -37,6 +37,9 @@ if nargin<5 || isempty(x_in)
     x_in = [];
     y_in = [];
 end
+
+global attack;
+
 %% clean up the ps structure
 ps = updateps(ps);
 
@@ -80,11 +83,12 @@ if opt.sim.writelog
     if isempty(out)
         error('simgrid:err','could not open outfile: %s',outfilename);
     end
+    fprintf(out,'starting simulation at t = %g\n',t);
     fclose(out);
 end
 
 if verbose
-    fprintf(out,'starting simulation at t = %g\n',t);
+    
     fprintf('starting simulation at t = %g\n',t);
     fprintf('writing results to %s\n',outfilename);
 end
@@ -126,14 +130,22 @@ while t < t_end
     
     %******************************
     %
-    %       attack goes here
-    %
-    %       May need to run get_mac_state() to get x matrix
+    %   GPS Spoofing Attack
     %
     %******************************
     
-    if opt.sim.use_data_correction    % requesting the data correction algorithm
+    if ~isempty(attack)
+        if attack.t_start <= attack.t_cur && attack.t_cur <= attack.t_end
+            if opt.sim.attack_data
+                y = Spoofing_Attack(y, ps);
+            end
+        end
+    end
+    
+    if opt.sim.use_data_correction
         % Grab relevant data (ps, x, y)
+        % Send the Ybus: ps.Ybus
+        y = Data_corrrection_module(y, ps);
         
     end
     
@@ -176,7 +188,9 @@ end
 outputs.event_record    = event_record;
 outputs.computer_time   = etime(clock,ct);
 
-% save(tracefilename,'x','y');
+if opt.sim.writelog
+    save(tracefilename,'x','y');
+end
 if opt.verbose
     fprintf('Completed simulation from %d sec. to %d sec. \n',t_0,t_next);
 end 

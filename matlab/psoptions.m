@@ -49,6 +49,11 @@ opt.sim.dt_max_default = 1/60;
 opt.sim.optimizer = 'linprog';
 opt.sim.resuming_sim = 0;       % If set to 1, x and y vectors must be supplied
 
+opt.sim.use_data_correction = false;    % Enable or disable data correction
+opt.sim.attack_data = false;            % Launch a voltage angle attack
+opt.sim.use_rollout_policy = false;     % Rollout load shedding algorithm
+opt.sim.use_relays = 'all';             % Which relays to use
+
 % temperature relay settings
 opt.sim.temp.TA        = 75-20;        % the thermal limits for ACSR conductor, 75C; the ambient temerature 20C
 
@@ -59,9 +64,6 @@ opt.sim.uvls_delta = 0.25;     % the fraction of load that is shed during simula
 opt.sim.ufls_limit = 0.95;     % threshold at which under frequency load shedding occurs
 opt.sim.ufls_delta = 0.25;     % load shedding fraction
 opt.sim.zone1_distance = 0.9;  % zone 1 default distance (90% of line impedance)
-
-%
-opt.sim.use_data_correction = false;
 
 % legacy
 opt.simdc = opt.sim;

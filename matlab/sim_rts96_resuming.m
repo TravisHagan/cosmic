@@ -28,7 +28,7 @@ opt = psoptions;
 % Change this value if resuming or not resuming from a previous save state
 %***********************************************************************
 
-opt.sim.resuming_sim = 1;
+opt.sim.resuming_sim = 0;
 
 % 0 - not resuming case, 1 - loads value from a previous simulation
 %***********************************************************************
@@ -37,7 +37,7 @@ opt.sim.resuming_sim = 1;
 %%
 
 if opt.sim.resuming_sim == 0
-    load('rts96.mat','ps')
+    load('rts96_S_load.mat','ps')
     x_in = [];
     y_in = [];
 else
@@ -58,7 +58,7 @@ opt.sim.integration_scheme      = 1;
 opt.sim.dt_default              = 1/10;
 opt.nr.use_fsolve               = true;
 % opt.pf.linesearch             = 'cubic_spline';
-opt.verbose                     = true;
+opt.verbose                     = false;
 opt.sim.gen_control = 1;        % 0 = generator without exciter and governor, 1 = generator with exciter and governor
 opt.sim.angle_ref = 0;          % 0 = delta_sys, 1 = center of inertia---delta_coi
                                 % Center of inertia doesn't work when having islanding

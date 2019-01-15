@@ -31,8 +31,8 @@ ps = updateps(casename);
 % convert loads
 ps.shunt(:,C.sh.status)     = 1;
 ps.shunt(:,C.sh.frac_Y)     = 0;
-ps.shunt(:,C.sh.frac_S)     = 0;
-ps.shunt(:,C.sh.frac_E)     = 1;
+ps.shunt(:,C.sh.frac_S)     = 1;
+ps.shunt(:,C.sh.frac_E)     = 0;
 ps.shunt(:,C.sh.gamma)      = 0.08;
 
 % run a power flow in order to set the correct power limits

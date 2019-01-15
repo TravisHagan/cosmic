@@ -1,10 +1,12 @@
 %% Rollout policy simulation file
 clear all; close all; clc;
 
-t_cont = 5;             % When the contingency should occur
-t_rollout = 10;         % When the rollout policy begins
-t_max = 30;             % Simulation end time
-time_step = 1/60;       % Time step for rollout policy
+time.contingency = 5;       % When the contingency should occur
+time.rollout = 10;          % Time when rollout policy starts
+time.max = 25;              % Maximum rollout sim time
+time.step = 1/30;           % Time step for rollout policy
+time.step1 = 1/5;           % Time step for rollout policy (after 5 sec)
+time.step2 = 1;             % Time step for rollout policy (after 10 sec)
 
 if ~(ismcc || isdeployed)
     addpath('../data');
@@ -13,28 +15,47 @@ end
 
 C = psconstants;
 opt = psoptions;
+input_file = 'rts96_S.mat';
 
-load('rts96.mat','ps');
+load(input_file,'ps');
+
+%********** Features in Progress *************
+opt.sim.use_data_correction = false;
+opt.sim.attack_data = false;
+opt.sim.use_rollout_policy = false;
+opt.sim.use_relays = 'none';            % See get_relays or use 'none' or 'all'
+%*********************************************
 
 %% Output file:
-
-opt.sim.use_data_correction = true;
-
-results = cell(length(ps.branch(:,1)),4);         % Allocate cell matrix
+results = cell(length(ps.branch(:,1)),4);         % Allocate cell matrix for results files
 
 output_file = sprintf('sim_rts96_%s', datestr(now,'yyyy-mm-dd_HHMMSS'));
 
-results_struct.begin_time = datestr(now);
-results_struct.t_max = t_max;
-results_struct.data_correction = opt.sim.use_data_correction;
+output.begin_time = datestr(now);
+output.t_max = time.max;
+output.data_correction = opt.sim.use_data_correction;
+output.attacked_data = opt.sim.attack_data;
+output.use_rollout_policy = opt.sim.use_rollout_policy;
+output.use_relays = opt.sim.use_relays;
+
 
 
 %%
 for k = 1:length(ps.branch(:,1))
-    results{k,1} = ps.branch(k, C.br.from);
-    results{k,2} = ps.branch(k, C.br.to);
+%for k = 1:3                                    % For testing
+    
+    % Store case details
+    from_bus = ps.branch(k, C.br.from);
+    to_bus = ps.branch(k, C.br.to);
+    results{k,1} = from_bus;
+    results{k,2} = to_bus;
     results{k,3} = ps.branch(k, C.br.id);
-    load('rts96.mat','ps')
+    
+    % Reload case
+    load(input_file,'ps')
+    
+    % Temporary file in-case of program crash, etc...
+    Rollout_file = strcat('Branch_trip_',num2str(from_bus),'_',num2str(to_bus));
     
     fprintf('****************************************\n')
     fprintf('       New simulation beginning         \n')
@@ -47,11 +68,10 @@ for k = 1:length(ps.branch(:,1))
     ps.branch(rateB_rateA == 1,C.br.rateB) = 1.1*ps.branch(rateB_rateA == 1,C.br.rateA);
     ps.branch(rateC_rateA == 1,C.br.rateC) = 1.5*ps.branch(rateC_rateA == 1,C.br.rateA);
     
-    % set some options
+    % Reset options
     opt.sim.integration_scheme      = 1;
     opt.sim.dt_default              = 1/10;
     opt.nr.use_fsolve               = true;
-    % opt.pf.linesearch             = 'cubic_spline';
     opt.verbose                     = false;
     opt.sim.gen_control = 1;        % 0 = generator without exciter and governor, 1 = generator with exciter and governor
     opt.sim.angle_ref = 0;          % 0 = delta_sys, 1 = center of inertia---delta_coi
@@ -63,11 +83,8 @@ for k = 1:length(ps.branch(:,1))
     opt.sim.temp_tdelay_ini = 1e6;    % 0 sec delay for temp relay.
     opt.sim.writelog = false;
     % Don't forget to change this value (opt.sim.time_delay_ini) in solve_dae.m
-
-    opt.sim.var_step = 0.1;
-    opt.sim.dt_max_default = 0.1;
-
-
+    
+    % Reset devices:
     % ps = unify_generators(ps);
     % ps.branch(:,C.br.tap)       = 1;
     % ps.shunt(:,C.sh.factor)     = 1;    % C.sh.factor is the same as C.sh.status
@@ -87,10 +104,10 @@ for k = 1:length(ps.branch(:,1))
     [ps.mac, ps.exc, ps.gov] = get_mac_state(ps, 'salient');
     
     % Initialize relays
-    ps.relay = get_relays(ps, 'all', opt);
+    ps.relay = get_relays(ps, opt.sim.use_relays, opt);
     
     % Initialize global variables
-    global t_delay t_prev_check dist2threshold state_a;
+    global t_delay t_prev_check dist2threshold state_a attack;
     n                       = size(ps.bus, 1);
     ng                      = size(ps.mac, 1);
     m                       = size(ps.branch, 1);
@@ -104,6 +121,13 @@ for k = 1:length(ps.branch(:,1))
     t_prev_check            = nan(size(ps.relay, 1), 1);
     dist2threshold          = inf(size(ix.re.oc, 2)*2, 1);
     state_a                 = zeros(size(ix.re.oc, 2)*2, 1);
+    attack.bus              = 101;                  % GPS Spoofing bus/buses
+    attack.t_start          = 5;                    % When Spoofing attack starts
+    attack.t_end            = time.max;             % End of Spoofing attack
+    attack.t_cur            = 0;                    % Stored variable for attack module
+    attack.flag             = true;                 % 
+    attack.values_i         = [];                   % Initial variables
+    attack.values           = [];                   % Current variables
     
     
     %% Build an event matrix
@@ -113,11 +137,11 @@ for k = 1:length(ps.branch(:,1))
     event(1,[C.ev.time C.ev.type]) = [0 C.ev.start];
     
     % trip a branch
-    event(2,[C.ev.time C.ev.type]) = [t_cont C.ev.trip_branch];
+    event(2,[C.ev.time C.ev.type]) = [time.contingency C.ev.trip_branch];
     event(2, C.ev.branch_loc) = ps.branch(k, C.br.id);
     
     % set the end time
-    event(3,[C.ev.time C.ev.type]) = [t_rollout C.ev.finish];
+    event(3,[C.ev.time C.ev.type]) = [time.rollout C.ev.finish];
 
 
     %% run the simulation
@@ -125,18 +149,29 @@ for k = 1:length(ps.branch(:,1))
     
     save_sim_state(ps,x,y,'save_state');
 
-    results{k,4} = RolloutPolicy(ps, opt, C, time_step, (t_max-t_rollout), 'save_state');
+    % results
+    if opt.sim.use_rollout_policy
+        results{k,4} = RolloutPolicy(ps, opt, C, time, 'save_state', Rollout_file);
+    else
+        results{k,4} = Non_rollout_case(ps, opt, c, time, 'save_state', Rollout_file);
+    end
     
-    % Take some action and continue simulation...
+    %
+    %
+    %
+    %
     % Implement later
-    
-            
+    % Get highest reward and shed load, continue simulation
+    %
+    %
+    %
+    %       
 end
 
-results_struct.end_time = datestr(now);
-results_struct.calculations = results;
+output.end_time = datestr(now);
+output.calculations = results;
 
-save(output_file,'results_struct');
+save(output_file,'output');
 
 
 
