@@ -15,7 +15,7 @@ end
 
 C = psconstants;
 opt = psoptions;
-input_file = 'rts96_S.mat';
+input_file = 'rts96.mat';
 
 load(input_file,'ps');
 
